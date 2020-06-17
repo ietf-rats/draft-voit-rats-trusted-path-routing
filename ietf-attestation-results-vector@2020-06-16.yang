@@ -1,0 +1,206 @@
+module ietf-attestation-results-vector {
+  yang-version 1.1;
+  namespace 
+     "urn:ietf:params:xml:ns:yang:ietf-attestation-results-vector";
+  prefix arv;
+  
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import ietf-tpm-remote-attestation { 
+    prefix tpm; 
+    reference  
+      "draft-ietf-rats-yang-tpm-charra";  
+  }
+  import ietf-asymmetric-algs {
+    prefix aa;
+  }
+  import ietf-crypto-types {
+    prefix ct;
+    reference  
+      "RFC XXXX: Common YANG Data Types for Cryptography
+      (currently draft-ietf-netconf-crypto-types)";
+  }
+   
+  organization "IETF";
+  contact
+    "WG Web:   <http://tools.ietf.org/wg/rats/>
+     WG List:  <mailto:rats@ietf.org>
+
+     Editor:   Eric Voit
+               <mailto:evoit@cisco.com>";
+               
+  description
+    "This module contains conceptual YANG specifications for  
+    subscribing to attestation streams being generated from TPM chips.
+    
+    Copyright (c) 2020 IETF Trust and the persons identified as authors 
+    of the code.  All rights reserved.
+
+    Redistribution and use in source and binary forms, with or without 
+    modification, is permitted pursuant to, and subject to the license 
+    terms contained in, the Simplified BSD License set forth in Section 
+    4.c of the IETF Trust's Legal Provisions Relating to IETF Documents
+    (https://trustee.ietf.org/license-info).
+
+    This version of this YANG module is part of RFC XXXX; see the RFC 
+    itself for full legal notices.";
+  
+  revision 2020-06-16 {
+    description
+      "Initial version.";    
+    reference 
+      "draft-voit-rats-trusted-path-routing";
+  }
+
+
+  /*
+   * IDENTITIES
+   */ 
+
+  identity trustworthiness-level {
+    description
+      "Base identity for a Verifier that uses its Appraisal Policy for 
+      Evidence to establish a trustworthiness level.";
+  }
+
+  identity trustworthiness-pass {
+    description
+      "A trustworthiness-level which successfully meets an Appraisal Policy for 
+      Evidence.";
+  }
+  
+  identity trustworthiness-fail {
+    description
+      "A trustworthiness-level which hit Appraisal Policy for Evidence
+      necessary to fail an evaluation.  Note: this failure might or might not
+      consider whether sufficient Evidence has been provided.  In other words
+      having insufficient evidence might not drive the setting of this failing
+      trustworthiness-level.";
+  }
+
+  identity boot-verified {
+    base trustworthiness-pass;
+    description
+      "A Verifier has appraised an Attester as Boot Integrity Verified.";
+  }
+  
+  identity boot-verification-fail {
+    base trustworthiness-fail;
+    description
+      "A Verifier has appraised an Attester has failed its Boot Integrity 
+      verification.";
+  }
+
+  identity hw-authentic {
+    base trustworthiness-pass;
+    description
+      "A Verifier has appraised an Attester as having authentic hardware.";
+  }
+  
+  identity fw-authentic {
+    base trustworthiness-pass;
+    description
+      "A Verifier has appraised an Attester as having authentic firmware.";
+  }
+  
+  identity hw-verification-fail {
+    base trustworthiness-fail;
+    description
+      "A Verifier has appraised an Attester has failed its hardware or  
+      firmware verification.";
+  }
+  identity identity-verified {
+    base trustworthiness-pass;
+    description
+      "A Verifier has appraised and verified an Attester's unique identity.";
+  }
+  
+  identity identity-fail {
+    base trustworthiness-fail;
+    description
+      "A Verifier has been unable to assess or verify an Attester's unique 
+      identity";
+  }
+  
+  identity files-verified {
+    base trustworthiness-pass;
+    description
+      "A Verifier has appraised an Attester's file system, and asserts that
+      it recognizes relevant files.";
+  }
+  
+  identity file-blacklisted {
+    base trustworthiness-fail;
+    description
+      "A Verifier has found a file on an Attester which should not be 
+      present.";
+  }
+  
+  /*
+   * DATA NODES
+   */  
+
+  container attestation-results {
+    presence 
+      "An attestation Verifier has appraised the security posture of the
+      device, and returned the results within this container.";
+    description
+      "Containes the latest Verifier appraisal of an Attester.";   
+    leaf-list trustworthiness-vector {
+      type identityref {
+        base trustworthiness-level;
+      }
+      ordered-by system;
+      description
+        "One or more Trustworthiness Levels assigned which expose the 
+        Verifier's evaluation of the Evidence associated with the 
+        'tpmt-signature'.";
+    }
+    leaf timestamp {
+      type yang:date-and-time;
+      mandatory true;
+      description
+        "The timestamp of the Verifier's appraisal.  Where there is not a 
+        more robust mechanism, this can be used by a Relying Party to determine
+        the freshness of the attestation results.";
+    }
+    leaf tpmt-signature {
+      type binary;
+      description
+        "Must match a recent tpmt-signature sent in a notification to 
+        a Verifier.  This allows correlation of the Attestation Results to
+        a recent PCR change.";
+    } 
+    uses ct:public-key-grouping {
+      description
+        "In order to avoid having to provision AIK certificates on a Relying
+        Party network device, it is possible to send the AIK public key as 
+        from the Verifier as part of the passport. This is safe because the 
+        key is signed by the Verifier (hence vouching for its validity.)
+        The two objects within this group allow the Verifier to include this
+        information as part of the Attestation Results.";
+    }
+    leaf public-key-algorithm-type {
+      type identityref {
+        base aa:asymmetric-algorithm-type;
+      }
+      description
+        "Indicates what kind of algorithm is used with the Attester's 
+        Public Key Value.";  
+    }  
+    leaf verifier-signature-key-name {
+      type binary;
+      description
+        "Name of the key the Verifier used to sign the results.";
+    }  
+    leaf verifier-signature {
+      type binary;
+      mandatory true;
+      description
+        "Signature of the Verifier across all the objects within the
+        attestation-results container.  The signature will assume the 
+        sequence of objects as defined in the YANG model schema.";
+    }    
+  }
+}
